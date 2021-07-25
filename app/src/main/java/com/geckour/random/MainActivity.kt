@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -31,10 +32,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.geckour.random.ui.theme.RandomTheme
@@ -75,7 +78,7 @@ fun Generator(seed: Long, onCopyPassword: (password: String) -> Unit) {
 
     Column(
         modifier = Modifier
-            .padding(16.dp)
+            .padding(horizontal = 16.dp, vertical = 48.dp)
             .fillMaxWidth()
             .wrapContentHeight(align = Alignment.Top)
     ) {
@@ -158,7 +161,7 @@ fun CustomCharSets(customCharSet: MutableState<String>, customCharSetEnabled: Mu
         Row(modifier = Modifier
             .fillMaxWidth()
             .clickable { customCharSetEnabled.value = customCharSetEnabled.value.not() }
-        )  {
+        ) {
             Checkbox(
                 modifier = Modifier.padding(vertical = 4.dp),
                 checked = customCharSetEnabled.value,
@@ -186,7 +189,7 @@ fun Generate(onGenerateInvoked: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp)
+            .padding(top = 16.dp)
     ) {
         Button(modifier = Modifier.align(Alignment.CenterEnd), onClick = onGenerateInvoked) {
             Text(text = "GENERATE", fontWeight = FontWeight.Bold)
@@ -196,9 +199,23 @@ fun Generate(onGenerateInvoked: () -> Unit) {
 
 @Composable
 fun PasswordDisplay(password: String, onCopyPassword: (password: String) -> Unit) {
+    val passwordFontSize = 20.sp
+    val passwordFontSizePx = with(LocalDensity.current) { passwordFontSize.toPx() }
+    var passwordCharWidth by remember { mutableStateOf(passwordFontSizePx) }
+    var passwordViewWidth by remember { mutableStateOf(passwordFontSizePx) }
+    Text(
+        text = " ",
+        fontSize = passwordFontSize,
+        fontFamily = FontFamily.Monospace,
+        color = Color.Transparent,
+        softWrap = false,
+        onTextLayout = {
+            passwordCharWidth = it.size.width.toFloat()
+        }
+    )
     Column(
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .padding(top = 48.dp)
     ) {
         Button(
@@ -208,16 +225,32 @@ fun PasswordDisplay(password: String, onCopyPassword: (password: String) -> Unit
         }
         SelectionContainer(
             modifier = Modifier
+                .fillMaxSize()
                 .padding(top = 16.dp)
-                .align(Alignment.CenterHorizontally)
         ) {
             Text(
-                text = password,
-                fontSize = 20.sp,
-                fontFamily = FontFamily.Monospace
+                text = password.withWrap(passwordViewWidth, passwordCharWidth),
+                fontSize = passwordFontSize,
+                fontFamily = FontFamily.Monospace,
+                textAlign = TextAlign.Center,
+                softWrap = false,
+                onTextLayout = {
+                    passwordViewWidth = it.size.width.toFloat()
+                }
             )
         }
     }
+}
+
+private fun String.withWrap(viewWidth: Float, charWidth: Float): String {
+    val wrapDigit = (viewWidth / charWidth).toInt()
+    var result = ""
+    this.forEachIndexed { index, char ->
+        if (index % wrapDigit == 0) result += '\n'
+        result += char
+    }
+
+    return result.trim()
 }
 
 private fun makePassword(
