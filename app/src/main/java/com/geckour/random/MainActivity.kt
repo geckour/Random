@@ -41,7 +41,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.geckour.random.ui.theme.RandomTheme
 import org.koin.android.ext.android.get
-import timber.log.Timber
 import kotlin.random.Random
 
 class MainActivity : ComponentActivity() {
@@ -207,7 +206,6 @@ fun Generate(onGenerateInvoked: () -> Unit) {
 @Composable
 fun PasswordDisplay(password: String, wrappedPassword: MutableState<String>, counter: MutableState<Int>, onCopyPassword: (password: String) -> Unit) {
     val passwordFontSize = 20.sp
-    Timber.d("grandom password: $password")
     Column(
         modifier = Modifier
             .fillMaxSize()
