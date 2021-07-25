@@ -20,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.unit.sp
 import com.geckour.random.ui.theme.RandomTheme
-import com.geckour.random.ui.theme.SeedRepository
 import org.koin.android.ext.android.get
 
 class SetupActivity : ComponentActivity() {

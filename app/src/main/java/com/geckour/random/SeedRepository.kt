@@ -1,4 +1,4 @@
-package com.geckour.random.ui.theme
+package com.geckour.random
 
 import android.content.SharedPreferences
 import androidx.core.content.edit

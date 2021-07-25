@@ -1,7 +1,6 @@
 package com.geckour.random
 
 import android.app.Application
-import com.geckour.random.ui.theme.SeedRepository
 import org.koin.android.ext.android.get
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.GlobalContext

@@ -33,12 +33,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.geckour.random.ui.theme.RandomTheme
-import com.geckour.random.ui.theme.SeedRepository
 import org.koin.android.ext.android.get
 import kotlin.random.Random
 
@@ -190,7 +189,7 @@ fun Generate(onGenerateInvoked: () -> Unit) {
             .padding(top = 8.dp)
     ) {
         Button(modifier = Modifier.align(Alignment.CenterEnd), onClick = onGenerateInvoked) {
-            Text(text = "GENERATE")
+            Text(text = "GENERATE", fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -205,7 +204,7 @@ fun PasswordDisplay(password: String, onCopyPassword: (password: String) -> Unit
         Button(
             modifier = Modifier.align(Alignment.CenterHorizontally),
             onClick = { onCopyPassword(password) }) {
-            Text(text = "COPY")
+            Text(text = "COPY", fontWeight = FontWeight.Bold)
         }
         SelectionContainer(
             modifier = Modifier
@@ -215,8 +214,7 @@ fun PasswordDisplay(password: String, onCopyPassword: (password: String) -> Unit
             Text(
                 text = password,
                 fontSize = 20.sp,
-                fontFamily = FontFamily.Monospace,
-                overflow = TextOverflow.Clip
+                fontFamily = FontFamily.Monospace
             )
         }
     }

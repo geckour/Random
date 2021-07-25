@@ -2,7 +2,6 @@ package com.geckour.random
 
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
-import com.geckour.random.ui.theme.SeedRepository
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 
