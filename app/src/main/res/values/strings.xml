@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Random</string>
+    <string name="greeting_message">Tap 5 times for creating random seed.</string>
 </resources>
