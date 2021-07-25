@@ -228,9 +228,9 @@ private fun makePassword(
     forceGenerate: Long
 ): String {
     val random = Random(seed + System.currentTimeMillis())
-    val charSet = (customCharSet + charSetKinds.toList().map { it.charSet }.flatten()).distinct()
+    val charSet = (customCharSet + charSetKinds.map { it.charSet }.flatten()).distinct()
     var result = ""
-    if (charSet.isEmpty()) return result
+    if (charSet.isEmpty() || digit < (charSetKinds.size + if (customCharSet.isEmpty()) 0 else 1)) return result
 
     while (result.containsAllCharSets(charSetKinds, customCharSet.joinToString("")).not()) {
         result = ""
