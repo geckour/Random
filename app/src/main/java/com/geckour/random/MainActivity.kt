@@ -32,7 +32,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.geckour.random.ui.theme.RandomTheme
 import org.koin.android.ext.android.get
+import timber.log.Timber
 import kotlin.random.Random
 
 class MainActivity : ComponentActivity() {
@@ -76,6 +76,9 @@ fun Generator(seed: Long, onCopyPassword: (password: String) -> Unit) {
     val customCharSetEnabled = remember { mutableStateOf(false) }
     val generateInvoked = remember { mutableStateOf(0L) }
 
+    val wrappedPassword = remember { mutableStateOf("") }
+    val counter = remember { mutableStateOf(0) }
+
     Column(
         modifier = Modifier
             .padding(horizontal = 16.dp, vertical = 48.dp)
@@ -87,13 +90,17 @@ fun Generator(seed: Long, onCopyPassword: (password: String) -> Unit) {
         CustomCharSets(customCharSet = customCharSet, customCharSetEnabled = customCharSetEnabled)
         Generate { generateInvoked.value = System.currentTimeMillis() }
         PasswordDisplay(
-            makePassword(
+            password = makePassword(
                 seed = seed,
                 digit = digit.value,
                 charSetKinds = charSetKinds.value,
                 customCharSet = if (customCharSetEnabled.value) customCharSet.value.toList() else emptyList(),
-                forceGenerate = generateInvoked.value
+                forceGenerate = generateInvoked.value,
+                wrappedPassword = wrappedPassword,
+                counter = counter
             ),
+            wrappedPassword = wrappedPassword,
+            counter = counter,
             onCopyPassword = onCopyPassword
         )
     }
@@ -198,21 +205,9 @@ fun Generate(onGenerateInvoked: () -> Unit) {
 }
 
 @Composable
-fun PasswordDisplay(password: String, onCopyPassword: (password: String) -> Unit) {
+fun PasswordDisplay(password: String, wrappedPassword: MutableState<String>, counter: MutableState<Int>, onCopyPassword: (password: String) -> Unit) {
     val passwordFontSize = 20.sp
-    val passwordFontSizePx = with(LocalDensity.current) { passwordFontSize.toPx() }
-    var passwordCharWidth by remember { mutableStateOf(passwordFontSizePx) }
-    var passwordViewWidth by remember { mutableStateOf(passwordFontSizePx) }
-    Text(
-        text = " ",
-        fontSize = passwordFontSize,
-        fontFamily = FontFamily.Monospace,
-        color = Color.Transparent,
-        softWrap = false,
-        onTextLayout = {
-            passwordCharWidth = it.size.width.toFloat()
-        }
-    )
+    Timber.d("grandom password: $password")
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -229,28 +224,23 @@ fun PasswordDisplay(password: String, onCopyPassword: (password: String) -> Unit
                 .padding(top = 16.dp)
         ) {
             Text(
-                text = password.withWrap(passwordViewWidth, passwordCharWidth),
+                text = wrappedPassword.value,
                 fontSize = passwordFontSize,
                 fontFamily = FontFamily.Monospace,
                 textAlign = TextAlign.Center,
                 softWrap = false,
                 onTextLayout = {
-                    passwordViewWidth = it.size.width.toFloat()
+                    if (counter.value < password.lastIndex) {
+                        if (it.didOverflowWidth) {
+                            wrappedPassword.value = wrappedPassword.value.dropLast(1) + '\n'
+                            counter.value--
+                        }
+                        wrappedPassword.value += password[counter.value++]
+                    }
                 }
             )
         }
     }
-}
-
-private fun String.withWrap(viewWidth: Float, charWidth: Float): String {
-    val wrapDigit = (viewWidth / charWidth).toInt()
-    var result = ""
-    this.forEachIndexed { index, char ->
-        if (index % wrapDigit == 0) result += '\n'
-        result += char
-    }
-
-    return result.trim()
 }
 
 private fun makePassword(
@@ -258,8 +248,13 @@ private fun makePassword(
     digit: Int,
     charSetKinds: List<CharSetKind>,
     customCharSet: List<Char> = emptyList(),
-    forceGenerate: Long
+    forceGenerate: Long,
+    wrappedPassword: MutableState<String>,
+    counter: MutableState<Int>
 ): String {
+    wrappedPassword.value = ""
+    counter.value = 0
+
     val random = Random(seed + System.currentTimeMillis())
     val charSet = (customCharSet + charSetKinds.map { it.charSet }.flatten()).distinct()
     var result = ""
