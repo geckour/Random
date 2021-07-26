@@ -94,10 +94,11 @@ fun Generator(seed: Long, onCopyPassword: (password: String) -> Unit) {
                 digit = digit.value,
                 charSetKinds = charSetKinds.value,
                 customCharSet = if (customCharSetEnabled.value) customCharSet.value.toList() else emptyList(),
-                forceGenerate = generateInvoked.value,
-                wrappedPassword = wrappedPassword,
-                counter = counter
-            ),
+                forceGenerate = generateInvoked.value
+            ).apply {
+                wrappedPassword.value = ""
+                counter.value = 0
+            },
             wrappedPassword = wrappedPassword,
             counter = counter,
             onCopyPassword = onCopyPassword
@@ -204,7 +205,8 @@ fun Generate(onGenerateInvoked: () -> Unit) {
 }
 
 @Composable
-fun PasswordDisplay(password: String, wrappedPassword: MutableState<String>, counter: MutableState<Int>, onCopyPassword: (password: String) -> Unit) {
+fun PasswordDisplay(password: String?, wrappedPassword: MutableState<String>, counter: MutableState<Int>, onCopyPassword: (password: String) -> Unit) {
+    password ?: return
     val passwordFontSize = 20.sp
     Column(
         modifier = Modifier
@@ -228,7 +230,7 @@ fun PasswordDisplay(password: String, wrappedPassword: MutableState<String>, cou
                 textAlign = TextAlign.Center,
                 softWrap = false,
                 onTextLayout = {
-                    if (counter.value < password.lastIndex) {
+                    if (counter.value < password.length) {
                         if (it.didOverflowWidth) {
                             wrappedPassword.value = wrappedPassword.value.dropLast(1) + '\n'
                             counter.value--
@@ -246,17 +248,12 @@ private fun makePassword(
     digit: Int,
     charSetKinds: List<CharSetKind>,
     customCharSet: List<Char> = emptyList(),
-    forceGenerate: Long,
-    wrappedPassword: MutableState<String>,
-    counter: MutableState<Int>
-): String {
-    wrappedPassword.value = ""
-    counter.value = 0
-
+    forceGenerate: Long
+): String? {
     val random = Random(seed + System.currentTimeMillis())
     val charSet = (customCharSet + charSetKinds.map { it.charSet }.flatten()).distinct()
     var result = ""
-    if (charSet.isEmpty() || digit < (charSetKinds.size + if (customCharSet.isEmpty()) 0 else 1)) return result
+    if (charSet.isEmpty() || digit < (charSetKinds.size + if (customCharSet.isEmpty()) 0 else 1)) return null
 
     while (result.containsAllCharSets(charSetKinds, customCharSet.joinToString("")).not()) {
         result = ""
