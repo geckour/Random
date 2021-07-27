@@ -1,4 +1,13 @@
 <resources>
     <string name="app_name">Random</string>
     <string name="greeting_message">Tap 5 times for creating random seed.</string>
+    <string name="label_clipboard">Generated password</string>
+    <string name="label_password_length">Password Length</string>
+    <string name="label_charset_number">0–9 (Number)</string>
+    <string name="label_charset_alphabet_upper">A–Z (Alphabet Uppercase)</string>
+    <string name="label_charset_alphabet_lower">a–z (Alphabet Lowercase)</string>
+    <string name="label_charset_ascii_symbol">ASCII Symbol Characters</string>
+    <string name="label_charset_custom">Custom Characters</string>
+    <string name="label_button_generate">GENERATE</string>
+    <string name="label_button_copy">COPY</string>
 </resources>

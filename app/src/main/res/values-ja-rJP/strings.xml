@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Random</string>
+    <string name="greeting_message">乱数のシード値を生成するために 5 回タップしてください</string>
+    <string name="label_clipboard">生成されたパスワード</string>
+    <string name="label_password_length">パスワードの長さ</string>
+    <string name="label_charset_number">0–9 (数字)</string>
+    <string name="label_charset_alphabet_upper">A–Z (アルファベット大文字)</string>
+    <string name="label_charset_alphabet_lower">a–z (アルファベット小文字)</string>
+    <string name="label_charset_ascii_symbol">ASCII 記号文字</string>
+    <string name="label_charset_custom">カスタム文字種</string>
+    <string name="label_button_generate">生成</string>
+    <string name="label_button_copy">コピー</string>
+</resources>

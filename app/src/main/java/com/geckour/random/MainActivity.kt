@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -57,7 +58,12 @@ class MainActivity : ComponentActivity() {
                 // A surface container using the 'background' color from the theme
                 Surface(color = MaterialTheme.colors.background) {
                     Generator(seed = get<SeedRepository>().getSeed()) { password ->
-                        getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Generated password", password))
+                        getSystemService(ClipboardManager::class.java).setPrimaryClip(
+                            ClipData.newPlainText(
+                                getString(R.string.label_clipboard),
+                                password
+                            )
+                        )
                     }
                 }
             }
@@ -123,7 +129,7 @@ fun Digit(digit: MutableState<Int>) {
                 textColor = Color.Red
             }
         },
-        label = { Text(text = "Password Length") },
+        label = { Text(text = stringResource(R.string.label_password_length)) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         textStyle = TextStyle(color = textColor)
     )
@@ -133,7 +139,7 @@ fun Digit(digit: MutableState<Int>) {
 fun CharSets(charSetKinds: MutableState<List<CharSetKind>>) {
     Column(modifier = Modifier.padding(top = 12.dp)) {
         CharSetKind.values().forEach { charSetKind ->
-            CharSetCheckbox(text = charSetKind.name) { checked ->
+            CharSetCheckbox(text = stringResource(charSetKind.labelResId)) { checked ->
                 charSetKinds.value = (if (checked) charSetKinds.value + charSetKind else charSetKinds.value - charSetKind).distinct()
             }
         }
@@ -176,7 +182,7 @@ fun CustomCharSets(customCharSet: MutableState<String>, customCharSetEnabled: Mu
                     customCharSetEnabled.value = it
                 }
             )
-            Text(modifier = Modifier.padding(4.dp), text = "Custom Characters")
+            Text(modifier = Modifier.padding(4.dp), text = stringResource(R.string.label_charset_custom))
         }
         OutlinedTextField(
             modifier = Modifier
@@ -199,13 +205,18 @@ fun Generate(onGenerateInvoked: () -> Unit) {
             .padding(top = 16.dp)
     ) {
         Button(modifier = Modifier.align(Alignment.CenterEnd), onClick = onGenerateInvoked) {
-            Text(text = "GENERATE", fontWeight = FontWeight.Bold)
+            Text(text = stringResource(R.string.label_button_generate), fontWeight = FontWeight.Bold)
         }
     }
 }
 
 @Composable
-fun PasswordDisplay(password: String?, wrappedPassword: MutableState<String>, counter: MutableState<Int>, onCopyPassword: (password: String) -> Unit) {
+fun PasswordDisplay(
+    password: String?,
+    wrappedPassword: MutableState<String>,
+    counter: MutableState<Int>,
+    onCopyPassword: (password: String) -> Unit
+) {
     password ?: return
     val passwordFontSize = 20.sp
     Column(
@@ -216,7 +227,7 @@ fun PasswordDisplay(password: String?, wrappedPassword: MutableState<String>, co
         Button(
             modifier = Modifier.align(Alignment.CenterHorizontally),
             onClick = { onCopyPassword(password) }) {
-            Text(text = "COPY", fontWeight = FontWeight.Bold)
+            Text(text = stringResource(R.string.label_button_copy), fontWeight = FontWeight.Bold)
         }
         SelectionContainer(
             modifier = Modifier
