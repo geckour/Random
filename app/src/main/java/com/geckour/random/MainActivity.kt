@@ -43,7 +43,6 @@ import androidx.compose.ui.unit.sp
 import com.geckour.random.ConfigRepository.Companion.DEFAULT_DIGIT
 import com.geckour.random.ui.theme.RandomTheme
 import org.koin.android.ext.android.get
-import timber.log.Timber
 import kotlin.random.Random
 
 class MainActivity : ComponentActivity() {
