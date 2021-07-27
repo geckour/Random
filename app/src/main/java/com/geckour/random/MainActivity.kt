@@ -259,7 +259,7 @@ fun PasswordDisplay(
     counter: MutableState<Int>,
     onCopyPassword: (password: String) -> Unit
 ) {
-    password ?: return
+    if (password.isNullOrBlank()) return
     val passwordFontSize = 20.sp
     Column(
         modifier = Modifier
