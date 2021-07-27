@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
@@ -18,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.geckour.random.ui.theme.RandomTheme
 import org.koin.android.ext.android.get
@@ -65,6 +67,6 @@ fun Greeting(message: String, onCompleteTapping: (points: List<Float>) -> Unit) 
             return@pointerInteropFilter true
         }
     ) {
-        Text(modifier = Modifier.align(Alignment.Center), text = message, fontSize = 20.sp)
+        Text(modifier = Modifier.align(Alignment.Center).padding(8.dp), text = message, fontSize = 18.sp)
     }
 }

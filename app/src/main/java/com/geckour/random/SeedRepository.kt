@@ -7,27 +7,27 @@ class SeedRepository(private val preferences: SharedPreferences) {
 
     companion object {
 
-        private const val KEY_INITIAL_SEED = "key_initial_seed"
-        private const val KEY_POINTED_SEED = "key_pointed_seed"
+        private const val KEY_SEED_INITIAL = "key_seed_initial"
+        private const val KEY_SEED_POINTED = "key_seed_pointed"
     }
 
     fun setInitializedTime(time: Long = System.currentTimeMillis()) {
-        if (preferences.contains(KEY_INITIAL_SEED).not()) {
+        if (preferences.contains(KEY_SEED_INITIAL).not()) {
             preferences.edit(commit = true) {
-                putLong(KEY_INITIAL_SEED, time)
+                putLong(KEY_SEED_INITIAL, time)
             }
         }
     }
 
     fun setTapPoints(points: List<Float>) {
         preferences.edit(commit = true) {
-            putString(KEY_POINTED_SEED, points.joinToString(":"))
+            putString(KEY_SEED_POINTED, points.joinToString(":"))
         }
     }
 
-    fun setupFinished(): Boolean = preferences.contains(KEY_INITIAL_SEED) && preferences.contains(KEY_POINTED_SEED)
+    fun setupFinished(): Boolean = preferences.contains(KEY_SEED_INITIAL) && preferences.contains(KEY_SEED_POINTED)
 
     fun getSeed(): Long =
-        preferences.getLong(KEY_INITIAL_SEED, System.currentTimeMillis()) +
-                (preferences.getString(KEY_POINTED_SEED, null)?.hashCode()?.toLong() ?: throw IllegalStateException())
+        preferences.getLong(KEY_SEED_INITIAL, System.currentTimeMillis()) +
+                (preferences.getString(KEY_SEED_POINTED, null)?.hashCode()?.toLong() ?: throw IllegalStateException())
 }

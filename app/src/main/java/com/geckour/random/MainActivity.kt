@@ -40,8 +40,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.geckour.random.ConfigRepository.Companion.DEFAULT_DIGIT
 import com.geckour.random.ui.theme.RandomTheme
 import org.koin.android.ext.android.get
+import timber.log.Timber
 import kotlin.random.Random
 
 class MainActivity : ComponentActivity() {
@@ -51,13 +53,30 @@ class MainActivity : ComponentActivity() {
         fun newIntent(context: Context) = Intent(context, MainActivity::class.java)
     }
 
+    private val digit = mutableStateOf(DEFAULT_DIGIT)
+    private val charsetKinds = mutableStateOf(CharsetKind.values().toList())
+    private val customCharset = mutableStateOf("")
+    private val customCharsetEnabled = mutableStateOf(false)
+
+    private lateinit var configRepository: ConfigRepository
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        configRepository = get()
+        restoreConfig()
+
         setContent {
             RandomTheme {
                 // A surface container using the 'background' color from the theme
                 Surface(color = MaterialTheme.colors.background) {
-                    Generator(seed = get<SeedRepository>().getSeed()) { password ->
+                    Generator(
+                        get<SeedRepository>().getSeed(),
+                        digit,
+                        charsetKinds,
+                        customCharset,
+                        customCharsetEnabled
+                    ) { password ->
                         getSystemService(ClipboardManager::class.java).setPrimaryClip(
                             ClipData.newPlainText(
                                 getString(R.string.label_clipboard),
@@ -69,16 +88,39 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+
+        restoreConfig()
+    }
+
+    override fun onPause() {
+        super.onPause()
+
+        configRepository.setDigit(digit.value)
+        configRepository.setEnabledCharsetKinds(charsetKinds.value)
+        configRepository.setCustomCharset(customCharset.value)
+        configRepository.setCustomCharsetEnabled(customCharsetEnabled.value)
+    }
+
+    private fun restoreConfig() {
+        digit.value = configRepository.getDigit()
+        charsetKinds.value = configRepository.getEnabledCharsetKinds()
+        customCharset.value = configRepository.getCustomCharset()
+        customCharsetEnabled.value = configRepository.getCustomCharsetEnabled()
+    }
 }
 
-private const val DEFAULT_DIGIT = 24
-
 @Composable
-fun Generator(seed: Long, onCopyPassword: (password: String) -> Unit) {
-    val digit = remember { mutableStateOf(DEFAULT_DIGIT) }
-    val charSetKinds = remember { mutableStateOf(CharSetKind.values().toList()) }
-    val customCharSet = remember { mutableStateOf("") }
-    val customCharSetEnabled = remember { mutableStateOf(false) }
+fun Generator(
+    seed: Long,
+    digit: MutableState<Int>,
+    charsetKinds: MutableState<List<CharsetKind>>,
+    customCharset: MutableState<String>,
+    customCharsetEnabled: MutableState<Boolean>,
+    onCopyPassword: (password: String) -> Unit
+) {
     val generateInvoked = remember { mutableStateOf(0L) }
 
     val wrappedPassword = remember { mutableStateOf("") }
@@ -91,15 +133,15 @@ fun Generator(seed: Long, onCopyPassword: (password: String) -> Unit) {
             .wrapContentHeight(align = Alignment.Top)
     ) {
         Digit(digit = digit)
-        CharSets(charSetKinds = charSetKinds)
-        CustomCharSets(customCharSet = customCharSet, customCharSetEnabled = customCharSetEnabled)
+        Charsets(charsetKinds = charsetKinds)
+        CustomCharsets(customCharset = customCharset, customCharsetEnabled = customCharsetEnabled)
         Generate { generateInvoked.value = System.currentTimeMillis() }
         PasswordDisplay(
             password = makePassword(
                 seed = seed,
                 digit = digit.value,
-                charSetKinds = charSetKinds.value,
-                customCharSet = if (customCharSetEnabled.value) customCharSet.value.toList() else emptyList(),
+                charsetKinds = charsetKinds.value,
+                customCharset = if (customCharsetEnabled.value) customCharset.value.toList() else emptyList(),
                 forceGenerate = generateInvoked.value
             ).apply {
                 wrappedPassword.value = ""
@@ -114,7 +156,7 @@ fun Generator(seed: Long, onCopyPassword: (password: String) -> Unit) {
 
 @Composable
 fun Digit(digit: MutableState<Int>) {
-    var text by remember { mutableStateOf(DEFAULT_DIGIT.toString()) }
+    var text by remember { mutableStateOf(digit.value.toString()) }
     var textColor by remember { mutableStateOf(Color.White) }
     OutlinedTextField(
         modifier = Modifier.fillMaxWidth(),
@@ -136,19 +178,19 @@ fun Digit(digit: MutableState<Int>) {
 }
 
 @Composable
-fun CharSets(charSetKinds: MutableState<List<CharSetKind>>) {
+fun Charsets(charsetKinds: MutableState<List<CharsetKind>>) {
     Column(modifier = Modifier.padding(top = 12.dp)) {
-        CharSetKind.values().forEach { charSetKind ->
-            CharSetCheckbox(text = stringResource(charSetKind.labelResId)) { checked ->
-                charSetKinds.value = (if (checked) charSetKinds.value + charSetKind else charSetKinds.value - charSetKind).distinct()
+        CharsetKind.values().forEach { charSetKind ->
+            CharsetCheckbox(text = stringResource(charSetKind.labelResId), enabled = charsetKinds.value.contains(charSetKind)) { checked ->
+                charsetKinds.value = (if (checked) charsetKinds.value + charSetKind else charsetKinds.value - charSetKind).distinct()
             }
         }
     }
 }
 
 @Composable
-fun CharSetCheckbox(text: String, onCheckStateChange: (checked: Boolean) -> Unit) {
-    var checked by remember { mutableStateOf(true) }
+fun CharsetCheckbox(text: String, enabled: Boolean, onCheckStateChange: (checked: Boolean) -> Unit) {
+    var checked by remember { mutableStateOf(enabled) }
     Row(modifier = Modifier
         .fillMaxWidth()
         .clickable {
@@ -169,17 +211,17 @@ fun CharSetCheckbox(text: String, onCheckStateChange: (checked: Boolean) -> Unit
 }
 
 @Composable
-fun CustomCharSets(customCharSet: MutableState<String>, customCharSetEnabled: MutableState<Boolean>) {
+fun CustomCharsets(customCharset: MutableState<String>, customCharsetEnabled: MutableState<Boolean>) {
     Column {
         Row(modifier = Modifier
             .fillMaxWidth()
-            .clickable { customCharSetEnabled.value = customCharSetEnabled.value.not() }
+            .clickable { customCharsetEnabled.value = customCharsetEnabled.value.not() }
         ) {
             Checkbox(
                 modifier = Modifier.padding(vertical = 4.dp),
-                checked = customCharSetEnabled.value,
+                checked = customCharsetEnabled.value,
                 onCheckedChange = {
-                    customCharSetEnabled.value = it
+                    customCharsetEnabled.value = it
                 }
             )
             Text(modifier = Modifier.padding(4.dp), text = stringResource(R.string.label_charset_custom))
@@ -188,9 +230,9 @@ fun CustomCharSets(customCharSet: MutableState<String>, customCharSetEnabled: Mu
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(start = 4.dp),
-            value = customCharSet.value,
+            value = customCharset.value,
             onValueChange = {
-                customCharSet.value = it
+                customCharset.value = it
             },
             label = { Text(text = "") }
         )
@@ -257,16 +299,16 @@ fun PasswordDisplay(
 private fun makePassword(
     seed: Long,
     digit: Int,
-    charSetKinds: List<CharSetKind>,
-    customCharSet: List<Char> = emptyList(),
+    charsetKinds: List<CharsetKind>,
+    customCharset: List<Char> = emptyList(),
     forceGenerate: Long
 ): String? {
     val random = Random(seed + System.currentTimeMillis())
-    val charSet = (customCharSet + charSetKinds.map { it.charSet }.flatten()).distinct()
+    val charSet = (customCharset + charsetKinds.map { it.charset }.flatten()).distinct()
     var result = ""
-    if (charSet.isEmpty() || digit < (charSetKinds.size + if (customCharSet.isEmpty()) 0 else 1)) return null
+    if (charSet.isEmpty() || digit < (charsetKinds.size + if (customCharset.isEmpty()) 0 else 1)) return null
 
-    while (result.containsAllCharSets(charSetKinds, customCharSet.joinToString("")).not()) {
+    while (result.containsAllCharsets(charsetKinds, customCharset.joinToString("")).not()) {
         result = ""
         repeat(digit) {
             result += charSet[random.nextInt(charSet.size)]
@@ -276,11 +318,11 @@ private fun makePassword(
     return result
 }
 
-private fun String.containsAllCharSets(charSetKinds: List<CharSetKind>, customCharSet: String): Boolean {
-    charSetKinds.forEach { charSetKind ->
-        if (charSetKind.charSet.all { this.contains(it).not() }) return false
+private fun String.containsAllCharsets(charsetKinds: List<CharsetKind>, customCharset: String): Boolean {
+    charsetKinds.forEach { charSetKind ->
+        if (charSetKind.charset.all { this.contains(it).not() }) return false
     }
-    if (customCharSet.isNotEmpty() && customCharSet.all { this.contains(it).not() }) return false
+    if (customCharset.isNotEmpty() && customCharset.all { this.contains(it).not() }) return false
 
     return true
 }

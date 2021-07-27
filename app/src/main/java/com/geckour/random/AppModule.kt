@@ -19,4 +19,8 @@ val appModule = module {
     single {
         SeedRepository(get())
     }
+
+    single {
+        ConfigRepository(get())
+    }
 }
