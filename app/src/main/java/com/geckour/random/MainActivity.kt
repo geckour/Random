@@ -41,8 +41,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.geckour.random.ConfigRepository.Companion.DEFAULT_DIGIT
+import com.geckour.random.ui.theme.DeepOrange600
+import com.geckour.random.ui.theme.Green600
+import com.geckour.random.ui.theme.LightBlue600
+import com.geckour.random.ui.theme.Lime600
+import com.geckour.random.ui.theme.Pink600
 import com.geckour.random.ui.theme.RandomTheme
 import org.koin.android.ext.android.get
+import kotlin.math.log2
+import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.random.Random
 
 class MainActivity : ComponentActivity() {
@@ -148,7 +156,9 @@ fun Generator(
             },
             wrappedPassword = wrappedPassword,
             counter = counter,
-            onCopyPassword = onCopyPassword
+            onCopyPassword = onCopyPassword,
+            digit = digit.value,
+            charsetKindCount = (charsetKinds.value.flatMap { it.charset } + if (customCharsetEnabled.value) customCharset.value.toList() else emptyList()).distinct().size
         )
     }
 }
@@ -253,31 +263,60 @@ fun Generate(onGenerateInvoked: () -> Unit) {
 
 @Composable
 fun PasswordDisplay(
+    digit: Int,
+    charsetKindCount: Int,
     password: String?,
     wrappedPassword: MutableState<String>,
     counter: MutableState<Int>,
     onCopyPassword: (password: String) -> Unit
 ) {
     if (password.isNullOrBlank()) return
-    val passwordFontSize = 20.sp
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(top = 48.dp)
     ) {
+        val entropy = calcPasswordEntropy(digit, charsetKindCount)
+        val (strengthMessageRes, strengthMessageColor) = when (entropy) {
+            in 0f..27.9f -> {
+                R.string.message_strength_very_weak to Pink600
+            }
+            in 28f..35.9f -> {
+                R.string.message_strength_weak to DeepOrange600
+            }
+            in 36f..59.9f -> {
+                R.string.message_strength_reasonable to Lime600
+            }
+            in 60f..127.9f -> {
+                R.string.message_strength_strong to Green600
+            }
+            else -> {
+                R.string.message_strength_very_strong to LightBlue600
+            }
+        }
+
         Button(
             modifier = Modifier.align(Alignment.CenterHorizontally),
             onClick = { onCopyPassword(password) }) {
             Text(text = stringResource(R.string.label_button_copy), fontWeight = FontWeight.Bold)
         }
+        Text(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp),
+            text = stringResource(strengthMessageRes, entropy),
+            color = strengthMessageColor,
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center
+        )
         SelectionContainer(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 16.dp)
+                .padding(top = 4.dp)
         ) {
             Text(
                 text = wrappedPassword.value,
-                fontSize = passwordFontSize,
+                fontSize = 20.sp,
                 fontFamily = FontFamily.Monospace,
                 textAlign = TextAlign.Center,
                 softWrap = false,
@@ -316,6 +355,8 @@ private fun makePassword(
 
     return result
 }
+
+private fun calcPasswordEntropy(digit: Int, charsetKindCount: Int): Float = (log2(charsetKindCount.toDouble().pow(digit)) * 10).roundToInt() / 10f
 
 private fun String.containsAllCharsets(charsetKinds: List<CharsetKind>, customCharset: String): Boolean {
     charsetKinds.forEach { charSetKind ->

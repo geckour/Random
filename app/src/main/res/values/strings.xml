@@ -10,4 +10,9 @@
     <string name="label_charset_custom">Custom Characters</string>
     <string name="label_button_generate">GENERATE</string>
     <string name="label_button_copy">COPY</string>
+    <string name="message_strength_very_strong">Very Strong (%.1f bits)</string>
+    <string name="message_strength_strong">Strong (%.1f bits)</string>
+    <string name="message_strength_reasonable">Reasonable (%.1f bits)</string>
+    <string name="message_strength_weak">Weak (%.1f bits)</string>
+    <string name="message_strength_very_weak">Very Weak (%.1f bits)</string>
 </resources>
