@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -52,6 +53,9 @@ import kotlin.math.log2
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.random.Random
+import kotlin.streams.toList
+
+private lateinit var passwordFontFamily: FontFamily
 
 class MainActivity : ComponentActivity() {
 
@@ -69,6 +73,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        passwordFontFamily = FontFamily(Font(R.font.ricty_discord_bold, weight = FontWeight.Bold), Font(R.font.ricty_discord_regular))
 
         configRepository = get()
         restoreConfig()
@@ -148,7 +154,7 @@ fun Generator(
                 seed = seed,
                 digit = digit.value,
                 charsetKinds = charsetKinds.value,
-                customCharset = if (customCharsetEnabled.value) customCharset.value.toList() else emptyList(),
+                customCharset = if (customCharsetEnabled.value) customCharset.value else "",
                 forceGenerate = generateInvoked.value
             ).apply {
                 wrappedPassword.value = ""
@@ -317,7 +323,8 @@ fun PasswordDisplay(
             Text(
                 text = wrappedPassword.value,
                 fontSize = 20.sp,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = passwordFontFamily,
+                fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 softWrap = false,
                 onTextLayout = {
@@ -338,18 +345,19 @@ private fun makePassword(
     seed: Long,
     digit: Int,
     charsetKinds: List<CharsetKind>,
-    customCharset: List<Char> = emptyList(),
+    customCharset: String = "",
     forceGenerate: Long
 ): String? {
     val random = Random(seed + System.currentTimeMillis())
-    val charSet = (customCharset + charsetKinds.map { it.charset }.flatten()).distinct()
+    val charSet = (customCharset + charsetKinds.map { it.charset }.flatten().joinToString(""))
     var result = ""
     if (charSet.isEmpty() || digit < (charsetKinds.size + if (customCharset.isEmpty()) 0 else 1)) return null
 
-    while (result.containsAllCharsets(charsetKinds, customCharset.joinToString("")).not()) {
+    val codePoints = charSet.codePoints().toList()
+    while (result.containsAllCharsets(charsetKinds, customCharset).not()) {
         result = ""
         repeat(digit) {
-            result += charSet[random.nextInt(charSet.size)]
+            result += String(intArrayOf(codePoints[random.nextInt(codePoints.size)]), 0, 1)
         }
     }
 
@@ -362,7 +370,8 @@ private fun String.containsAllCharsets(charsetKinds: List<CharsetKind>, customCh
     charsetKinds.forEach { charSetKind ->
         if (charSetKind.charset.all { this.contains(it).not() }) return false
     }
-    if (customCharset.isNotEmpty() && customCharset.all { this.contains(it).not() }) return false
+    val inputCodePoints = this.codePoints().toList()
+    if (customCharset.isNotEmpty() && customCharset.codePoints().toList().all { inputCodePoints.contains(it).not() }) return false
 
     return true
 }
