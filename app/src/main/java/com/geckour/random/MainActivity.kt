@@ -164,7 +164,7 @@ fun Generator(
             counter = counter,
             onCopyPassword = onCopyPassword,
             digit = digit.value,
-            charsetKindCount = (charsetKinds.value.flatMap { it.charset } + if (customCharsetEnabled.value) customCharset.value.toList() else emptyList()).distinct().size
+            charsetKindCount = (charsetKinds.value.flatMap { it.charset }.map { it.code } + if (customCharsetEnabled.value) customCharset.value.codePoints().toList() else emptyList()).distinct().size
         )
     }
 }
