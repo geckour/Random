@@ -277,6 +277,7 @@ fun PasswordDisplay(
     onCopyPassword: (password: String) -> Unit
 ) {
     if (password.isNullOrBlank()) return
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -320,6 +321,7 @@ fun PasswordDisplay(
                 .fillMaxSize()
                 .padding(top = 4.dp)
         ) {
+            val codePoints = password.codePoints().toList()
             Text(
                 text = wrappedPassword.value,
                 fontSize = 20.sp,
@@ -328,12 +330,13 @@ fun PasswordDisplay(
                 textAlign = TextAlign.Center,
                 softWrap = false,
                 onTextLayout = {
-                    if (counter.value < password.length) {
+                    if (counter.value < codePoints.size) {
                         if (it.didOverflowWidth) {
-                            wrappedPassword.value = wrappedPassword.value.dropLast(1) + '\n'
+                            val droppedCodePoints = wrappedPassword.value.codePoints().toList().dropLast(1).toIntArray()
+                            wrappedPassword.value = String(droppedCodePoints, 0, droppedCodePoints.size) + '\n'
                             counter.value--
                         }
-                        wrappedPassword.value += password[counter.value++]
+                        wrappedPassword.value += String(intArrayOf(codePoints[counter.value++]), 0, 1)
                     }
                 }
             )
