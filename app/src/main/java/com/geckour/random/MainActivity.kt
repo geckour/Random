@@ -55,6 +55,8 @@ import kotlin.math.roundToInt
 import kotlin.random.Random
 import kotlin.streams.toList
 
+private const val DIGIT_MAX = 1000
+
 private lateinit var passwordFontFamily: FontFamily
 
 class MainActivity : ComponentActivity() {
@@ -88,7 +90,8 @@ class MainActivity : ComponentActivity() {
                         digit,
                         charsetKinds,
                         customCharset,
-                        customCharsetEnabled
+                        customCharsetEnabled,
+                        ::storeConfig
                     ) { password ->
                         getSystemService(ClipboardManager::class.java).setPrimaryClip(
                             ClipData.newPlainText(
@@ -111,10 +114,7 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
 
-        configRepository.setDigit(digit.value)
-        configRepository.setEnabledCharsetKinds(charsetKinds.value)
-        configRepository.setCustomCharset(customCharset.value)
-        configRepository.setCustomCharsetEnabled(customCharsetEnabled.value)
+        storeConfig()
     }
 
     private fun restoreConfig() {
@@ -122,6 +122,13 @@ class MainActivity : ComponentActivity() {
         charsetKinds.value = configRepository.getEnabledCharsetKinds()
         customCharset.value = configRepository.getCustomCharset()
         customCharsetEnabled.value = configRepository.getCustomCharsetEnabled()
+    }
+
+    private fun storeConfig() {
+        configRepository.setDigit(digit.value)
+        configRepository.setEnabledCharsetKinds(charsetKinds.value)
+        configRepository.setCustomCharset(customCharset.value)
+        configRepository.setCustomCharsetEnabled(customCharsetEnabled.value)
     }
 }
 
@@ -132,6 +139,7 @@ fun Generator(
     charsetKinds: MutableState<List<CharsetKind>>,
     customCharset: MutableState<String>,
     customCharsetEnabled: MutableState<Boolean>,
+    onStoreConfig: () -> Unit,
     onCopyPassword: (password: String) -> Unit
 ) {
     val generateInvoked = remember { mutableStateOf(0L) }
@@ -148,7 +156,10 @@ fun Generator(
         Digit(digit = digit)
         Charsets(charsetKinds = charsetKinds)
         CustomCharsets(customCharset = customCharset, customCharsetEnabled = customCharsetEnabled)
-        Generate { generateInvoked.value = System.currentTimeMillis() }
+        Generate {
+            onStoreConfig()
+            generateInvoked.value = System.currentTimeMillis()
+        }
         PasswordDisplay(
             password = makePassword(
                 seed = seed,
@@ -164,15 +175,18 @@ fun Generator(
             counter = counter,
             onCopyPassword = onCopyPassword,
             digit = digit.value,
-            charsetKindCount = (charsetKinds.value.flatMap { it.charset }.map { it.code } + if (customCharsetEnabled.value) customCharset.value.codePoints().toList() else emptyList()).distinct().size
+            charsetKindCount = (charsetKinds.value.flatMap { it.charset }.map { it.code } + if (customCharsetEnabled.value) customCharset.value
+                .codePoints()
+                .toList() else emptyList()).distinct().size
         )
     }
 }
 
 @Composable
 fun Digit(digit: MutableState<Int>) {
+    val normalTextColor = MaterialTheme.colors.onBackground
     var text by remember { mutableStateOf(digit.value.toString()) }
-    var textColor by remember { mutableStateOf(Color.White) }
+    var textColor by remember { mutableStateOf(normalTextColor) }
     OutlinedTextField(
         modifier = Modifier.fillMaxWidth(),
         value = text,
@@ -180,13 +194,13 @@ fun Digit(digit: MutableState<Int>) {
             text = it
             it.toIntOrNull()?.let { numbered ->
                 digit.value = numbered
-                textColor = if (numbered > 0) Color.White else Color.Red
+                textColor = if (numbered in 1..DIGIT_MAX) normalTextColor else Color.Red
             } ?: run {
                 digit.value = 0
                 textColor = Color.Red
             }
         },
-        label = { Text(text = stringResource(R.string.label_password_length)) },
+        label = { Text(text = stringResource(R.string.label_password_length, DIGIT_MAX)) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         textStyle = TextStyle(color = textColor)
     )
@@ -285,6 +299,9 @@ fun PasswordDisplay(
     ) {
         val entropy = calcPasswordEntropy(digit, charsetKindCount)
         val (strengthMessageRes, strengthMessageColor) = when (entropy) {
+            null -> {
+                R.string.message_strength_very_strong to LightBlue600
+            }
             in 0f..27.9f -> {
                 R.string.message_strength_very_weak to Pink600
             }
@@ -311,7 +328,7 @@ fun PasswordDisplay(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 12.dp),
-            text = stringResource(strengthMessageRes, entropy),
+            text = stringResource(strengthMessageRes, entropy ?: Float.POSITIVE_INFINITY),
             color = strengthMessageColor,
             fontSize = 14.sp,
             textAlign = TextAlign.Center
@@ -354,7 +371,7 @@ private fun makePassword(
     val random = Random(seed + System.currentTimeMillis())
     val charSet = (customCharset + charsetKinds.map { it.charset }.flatten().joinToString(""))
     var result = ""
-    if (charSet.isEmpty() || digit < (charsetKinds.size + if (customCharset.isEmpty()) 0 else 1)) return null
+    if (charSet.isEmpty() || digit < (charsetKinds.size + if (customCharset.isEmpty()) 0 else 1) || digit > DIGIT_MAX) return null
 
     val codePoints = charSet.codePoints().toList()
     while (result.containsAllCharsets(charsetKinds, customCharset).not()) {
@@ -367,7 +384,9 @@ private fun makePassword(
     return result
 }
 
-private fun calcPasswordEntropy(digit: Int, charsetKindCount: Int): Float = (log2(charsetKindCount.toDouble().pow(digit)) * 10).roundToInt() / 10f
+private fun calcPasswordEntropy(digit: Int, charsetKindCount: Int): Float? = charsetKindCount.toDouble().pow(digit).let {
+    if (it.isInfinite()) null else (log2(it) * 10).roundToInt() / 10f
+}
 
 private fun String.containsAllCharsets(charsetKinds: List<CharsetKind>, customCharset: String): Boolean {
     charsetKinds.forEach { charSetKind ->
