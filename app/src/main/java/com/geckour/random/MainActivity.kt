@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.icu.text.BreakIterator
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -417,11 +418,11 @@ private fun makeAndCopyPassword(
     var result = ""
     if (charSet.isEmpty() || digit < (charsetKinds.size + if (customCharset.isEmpty()) 0 else 1) || digit > DIGIT_MAX) return null
 
-    val codePoints = charSet.codePoints().toList()
+    val chars = charSet.toGraphemeList()
     while (result.containsAllCharsets(charsetKinds, customCharset).not()) {
         result = ""
         repeat(digit) {
-            result += String(intArrayOf(codePoints[random.nextInt(codePoints.size)]), 0, 1)
+            result += chars[random.nextInt(chars.size)]
         }
     }
 
@@ -438,8 +439,26 @@ private fun String.containsAllCharsets(charsetKinds: List<CharsetKind>, customCh
     charsetKinds.forEach { charSetKind ->
         if (charSetKind.charset.all { this.contains(it).not() }) return false
     }
-    val inputCodePoints = this.codePoints().toList()
-    if (customCharset.isNotEmpty() && customCharset.codePoints().toList().all { inputCodePoints.contains(it).not() }) return false
+    if (customCharset.isNotEmpty()) {
+        val chars = customCharset.toGraphemeList()
+        val target = this.toGraphemeList()
+
+        return chars.any { target.contains(it) }
+    }
 
     return true
+}
+
+private fun String.toGraphemeList(): List<String> {
+    val breakIterator = BreakIterator.getCharacterInstance().apply { setText(this@toGraphemeList) }
+    val chars = mutableListOf<String>()
+    var start = breakIterator.first()
+    var end = breakIterator.next()
+    while (end != BreakIterator.DONE) {
+        chars.add(this.substring(start, end))
+        start = end
+        end = breakIterator.next()
+    }
+
+    return chars
 }
