@@ -8,32 +8,43 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Button
 import androidx.compose.material.Checkbox
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.OutlinedTextField
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
+import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -50,6 +61,8 @@ import com.geckour.random.ui.theme.LightBlue600
 import com.geckour.random.ui.theme.Lime600
 import com.geckour.random.ui.theme.Pink600
 import com.geckour.random.ui.theme.RandomTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.koin.android.ext.android.get
 import kotlin.math.log2
 import kotlin.math.pow
@@ -75,6 +88,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var configRepository: ConfigRepository
 
+    @OptIn(ExperimentalMaterialApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -85,23 +99,42 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             RandomTheme {
-                // A surface container using the 'background' color from the theme
-                Surface(color = MaterialTheme.colors.background) {
-                    Generator(
-                        get<SeedRepository>().getSeed(),
-                        digit,
-                        charsetKinds,
-                        customCharset,
-                        customCharsetEnabled,
-                        ::storeConfig
-                    ) { password ->
+                val interactionSource = remember { MutableInteractionSource() }
+                val ripple = rememberRipple()
+                val rippleEnabled = remember { mutableStateOf(false) }
+                val forceGenerate = remember { mutableStateOf(-1L) }
+                val password = makeAndCopyPassword(
+                    seed = get<SeedRepository>().getSeed(),
+                    digit = digit.value,
+                    charsetKinds = charsetKinds.value,
+                    customCharset = if (customCharsetEnabled.value) customCharset.value else "",
+                    onCopyPassword = { password ->
                         getSystemService(ClipboardManager::class.java).setPrimaryClip(
                             ClipData.newPlainText(
                                 getString(R.string.label_clipboard),
                                 password
                             )
                         )
-                    }
+                    },
+                    forceGenerate = forceGenerate.value
+                )
+                // A surface container using the 'background' color from the theme
+                Surface(color = MaterialTheme.colors.background) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clickable(enabled = rippleEnabled.value, indication = ripple, interactionSource = interactionSource, onClick = {})
+                    )
+                    Generator(
+                        password,
+                        digit,
+                        charsetKinds,
+                        customCharset,
+                        customCharsetEnabled,
+                        ::storeConfig,
+                        interactionSource,
+                        rippleEnabled,
+                    ) { forceGenerate.value = System.currentTimeMillis() }
                 }
             }
         }
@@ -136,56 +169,52 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun Generator(
-    seed: Long,
+    password: String?,
     digit: MutableState<Int>,
     charsetKinds: MutableState<List<CharsetKind>>,
     customCharset: MutableState<String>,
     customCharsetEnabled: MutableState<Boolean>,
     onStoreConfig: () -> Unit,
-    onCopyPassword: (password: String) -> Unit
+    surfaceInteractionSource: MutableInteractionSource,
+    rippleEnabled: MutableState<Boolean>,
+    onForceGenerate: () -> Unit
 ) {
-    val generateInvoked = remember { mutableStateOf(0L) }
-
-    val wrappedPassword = remember { mutableStateOf("") }
-    val counter = remember { mutableStateOf(0) }
 
     Column(
         modifier = Modifier
-            .padding(horizontal = 16.dp, vertical = 48.dp)
-            .fillMaxWidth()
-            .wrapContentHeight(align = Alignment.Top)
+            .padding(horizontal = 16.dp, vertical = 24.dp)
+            .fillMaxSize()
     ) {
+        val coroutineScope = rememberCoroutineScope()
         Digit(digit = digit)
         Charsets(charsetKinds = charsetKinds)
         CustomCharsets(customCharset = customCharset, customCharsetEnabled = customCharsetEnabled)
-        Generate {
-            onStoreConfig()
-            generateInvoked.value = System.currentTimeMillis()
-        }
-        PasswordDisplay(
-            password = makePassword(
-                seed = seed,
-                digit = digit.value,
-                charsetKinds = charsetKinds.value,
-                customCharset = if (customCharsetEnabled.value) customCharset.value else "",
-                forceGenerate = generateInvoked.value
-            ).apply {
-                wrappedPassword.value = ""
-                counter.value = 0
-            },
-            wrappedPassword = wrappedPassword,
-            counter = counter,
-            onCopyPassword = onCopyPassword,
+        Entropy(
             digit = digit.value,
             charsetKindCount = (charsetKinds.value.flatMap { it.charset }.map { it.code } + if (customCharsetEnabled.value) customCharset.value
                 .codePoints()
                 .toList() else emptyList()).distinct().size
         )
+        PasswordDisplay(
+            password = password,
+            onGenerateAndCopyPassword = { center ->
+                onStoreConfig()
+                onForceGenerate()
+                coroutineScope.launch {
+                    val press = PressInteraction.Press(center)
+                    rippleEnabled.value = true
+                    surfaceInteractionSource.tryEmit(press)
+                    delay(250)
+                    surfaceInteractionSource.tryEmit(PressInteraction.Release(press))
+                    rippleEnabled.value = false
+                }
+            }
+        )
     }
 }
 
 @Composable
-fun Digit(digit: MutableState<Int>) {
+fun ColumnScope.Digit(digit: MutableState<Int>) {
     val normalTextColor = MaterialTheme.colors.onBackground
     var text by remember { mutableStateOf(digit.value.toString()) }
     var textColor by remember { mutableStateOf(normalTextColor) }
@@ -210,11 +239,10 @@ fun Digit(digit: MutableState<Int>) {
 
 @Composable
 fun Charsets(charsetKinds: MutableState<List<CharsetKind>>) {
-    Column(modifier = Modifier.padding(top = 12.dp)) {
-        CharsetKind.values().forEach { charSetKind ->
-            CharsetCheckbox(text = stringResource(charSetKind.labelResId), enabled = charsetKinds.value.contains(charSetKind)) { checked ->
-                charsetKinds.value = (if (checked) charsetKinds.value + charSetKind else charsetKinds.value - charSetKind).distinct()
-            }
+    Spacer(modifier = Modifier.height(12.dp))
+    CharsetKind.values().forEach { charSetKind ->
+        CharsetCheckbox(text = stringResource(charSetKind.labelResId), enabled = charsetKinds.value.contains(charSetKind)) { checked ->
+            charsetKinds.value = (if (checked) charsetKinds.value + charSetKind else charsetKinds.value - charSetKind).distinct()
         }
     }
 }
@@ -222,155 +250,168 @@ fun Charsets(charsetKinds: MutableState<List<CharsetKind>>) {
 @Composable
 fun CharsetCheckbox(text: String, enabled: Boolean, onCheckStateChange: (checked: Boolean) -> Unit) {
     var checked by remember { mutableStateOf(enabled) }
-    Row(modifier = Modifier
-        .fillMaxWidth()
-        .clickable {
-            checked = checked.not()
-            onCheckStateChange(checked)
-        }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                checked = checked.not()
+                onCheckStateChange(checked)
+            },
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Checkbox(
-            modifier = Modifier.padding(vertical = 4.dp),
             checked = checked,
             onCheckedChange = {
                 checked = it
                 onCheckStateChange(it)
             }
         )
-        Text(modifier = Modifier.padding(4.dp), text = text)
+        Text(text = text)
     }
 }
 
 @Composable
 fun CustomCharsets(customCharset: MutableState<String>, customCharsetEnabled: MutableState<Boolean>) {
-    Column {
-        Row(modifier = Modifier
+    Row(
+        modifier = Modifier
             .fillMaxWidth()
             .clickable { customCharsetEnabled.value = customCharsetEnabled.value.not() }
-        ) {
-            Checkbox(
-                modifier = Modifier.padding(vertical = 4.dp),
-                checked = customCharsetEnabled.value,
-                onCheckedChange = {
-                    customCharsetEnabled.value = it
-                }
-            )
-            Text(modifier = Modifier.padding(4.dp), text = stringResource(R.string.label_charset_custom))
-        }
-        OutlinedTextField(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 4.dp),
-            value = customCharset.value,
-            onValueChange = {
-                customCharset.value = it
-            },
-            label = { Text(text = "") }
+    ) {
+        Checkbox(
+            modifier = Modifier.alignByBaseline(),
+            checked = customCharsetEnabled.value,
+            onCheckedChange = {
+                customCharsetEnabled.value = it
+            }
         )
+        Column {
+            Text(text = stringResource(R.string.label_charset_custom))
+            OutlinedTextField(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 4.dp),
+                value = customCharset.value,
+                maxLines = 1,
+                onValueChange = {
+                    customCharset.value = it
+                },
+                label = { Text(text = "") }
+            )
+        }
     }
 }
 
 @Composable
-fun Generate(onGenerateInvoked: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 16.dp)
-    ) {
-        Button(modifier = Modifier.align(Alignment.CenterEnd), onClick = onGenerateInvoked) {
-            Text(text = stringResource(R.string.label_button_generate), fontWeight = FontWeight.Bold)
+fun Entropy(digit: Int, charsetKindCount: Int) {
+    val entropy = calcPasswordEntropy(digit, charsetKindCount)
+    val (strengthMessageRes, strengthMessageColor) = when (entropy) {
+        null -> {
+            R.string.message_strength_very_strong to LightBlue600
+        }
+        in 0f..27.9f -> {
+            R.string.message_strength_very_weak to Pink600
+        }
+        in 28f..35.9f -> {
+            R.string.message_strength_weak to DeepOrange600
+        }
+        in 36f..59.9f -> {
+            R.string.message_strength_reasonable to Lime600
+        }
+        in 60f..127.9f -> {
+            R.string.message_strength_strong to Green600
+        }
+        else -> {
+            R.string.message_strength_very_strong to LightBlue600
         }
     }
+    Text(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp),
+        text = stringResource(strengthMessageRes, entropy ?: Float.POSITIVE_INFINITY),
+        color = strengthMessageColor,
+        fontSize = 14.sp,
+        textAlign = TextAlign.Center
+    )
 }
 
 @Composable
 fun PasswordDisplay(
-    digit: Int,
-    charsetKindCount: Int,
     password: String?,
-    wrappedPassword: MutableState<String>,
-    counter: MutableState<Int>,
-    onCopyPassword: (password: String) -> Unit
+    onGenerateAndCopyPassword: (copyButtonCenter: Offset) -> Unit
 ) {
-    if (password.isNullOrBlank()) return
-
+    var generateAndCopyButtonCenterOffset by remember { mutableStateOf(Offset(0f, 0f)) }
+    var wrappedPassword by remember { mutableStateOf(password) }
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = 48.dp)
+            .padding(top = 24.dp)
     ) {
-        val entropy = calcPasswordEntropy(digit, charsetKindCount)
-        val (strengthMessageRes, strengthMessageColor) = when (entropy) {
-            null -> {
-                R.string.message_strength_very_strong to LightBlue600
-            }
-            in 0f..27.9f -> {
-                R.string.message_strength_very_weak to Pink600
-            }
-            in 28f..35.9f -> {
-                R.string.message_strength_weak to DeepOrange600
-            }
-            in 36f..59.9f -> {
-                R.string.message_strength_reasonable to Lime600
-            }
-            in 60f..127.9f -> {
-                R.string.message_strength_strong to Green600
-            }
-            else -> {
-                R.string.message_strength_very_strong to LightBlue600
-            }
-        }
+        if (password.isNullOrBlank().not()) {
+            wrappedPassword = password
 
-        Button(
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-            onClick = { onCopyPassword(password) }) {
-            Text(text = stringResource(R.string.label_button_copy), fontWeight = FontWeight.Bold)
-        }
-        Text(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 12.dp),
-            text = stringResource(strengthMessageRes, entropy ?: Float.POSITIVE_INFINITY),
-            color = strengthMessageColor,
-            fontSize = 14.sp,
-            textAlign = TextAlign.Center
-        )
-        SelectionContainer(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 4.dp)
-        ) {
-            val codePoints = password.codePoints().toList()
-            Text(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                text = wrappedPassword.value,
-                fontSize = 20.sp,
-                fontFamily = passwordFontFamily,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                softWrap = false,
-                onTextLayout = {
-                    if (counter.value < codePoints.size) {
+            SelectionContainer(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f)
+                    .padding(top = 4.dp)
+            ) {
+                Text(
+                    modifier = Modifier
+                        .verticalScroll(rememberScrollState()),
+                    text = checkNotNull(wrappedPassword),
+                    fontSize = 20.sp,
+                    fontFamily = passwordFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    softWrap = false,
+                    onTextLayout = {
                         if (it.didOverflowWidth) {
-                            val droppedCodePoints = wrappedPassword.value.codePoints().toList().dropLast(1).toIntArray()
-                            wrappedPassword.value = String(droppedCodePoints, 0, droppedCodePoints.size) + '\n'
-                            counter.value--
+                            var currentTextWidth = 0f
+                            var result = ""
+                            it.layoutInput.text.forEachIndexed { index, c ->
+                                val charWidth = it.getBoundingBox(index).width
+                                currentTextWidth += charWidth
+                                result += if (currentTextWidth > it.layoutInput.constraints.maxWidth) {
+                                    currentTextWidth = charWidth
+                                    "\n$c"
+                                } else {
+                                    c
+                                }
+                            }
+                            wrappedPassword = result
                         }
-                        wrappedPassword.value += String(intArrayOf(codePoints[counter.value++]), 0, 1)
                     }
-                }
+                )
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .weight(1f)
             )
+        }
+        Button(
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .onPlaced { layoutCoordinates -> generateAndCopyButtonCenterOffset = layoutCoordinates.boundsInWindow().center },
+            onClick = { onGenerateAndCopyPassword(generateAndCopyButtonCenterOffset) }
+        ) {
+            Text(text = stringResource(R.string.label_button_generate_and_copy), fontWeight = FontWeight.Bold)
         }
     }
 }
 
-private fun makePassword(
+private fun makeAndCopyPassword(
     seed: Long,
     digit: Int,
     charsetKinds: List<CharsetKind>,
     customCharset: String = "",
+    onCopyPassword: (password: String) -> Unit,
     forceGenerate: Long
 ): String? {
+    if (forceGenerate < 0) return null
+
     val random = Random(seed + System.currentTimeMillis())
     val charSet = (customCharset + charsetKinds.map { it.charset }.flatten().joinToString(""))
     var result = ""
@@ -383,6 +424,8 @@ private fun makePassword(
             result += String(intArrayOf(codePoints[random.nextInt(codePoints.size)]), 0, 1)
         }
     }
+
+    onCopyPassword(result)
 
     return result
 }

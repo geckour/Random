@@ -8,8 +8,7 @@
     <string name="label_charset_alphabet_lower">a–z (アルファベット小文字)</string>
     <string name="label_charset_ascii_symbol">ASCII 記号文字</string>
     <string name="label_charset_custom">カスタム文字種</string>
-    <string name="label_button_generate">生成</string>
-    <string name="label_button_copy">コピー</string>
+    <string name="label_button_generate_and_copy">生成 &amp; コピー</string>
     <string name="message_strength_very_strong">非常に強い (%.1f bits)</string>
     <string name="message_strength_strong">強い (%.1f bits)</string>
     <string name="message_strength_reasonable">普通 (%.1f bits)</string>
