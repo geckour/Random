@@ -69,7 +69,6 @@ import kotlin.math.log2
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.random.Random
-import kotlin.streams.toList
 
 private const val DIGIT_MAX = 1000
 
@@ -192,9 +191,8 @@ fun Generator(
         CustomCharsets(customCharset = customCharset, customCharsetEnabled = customCharsetEnabled)
         Entropy(
             digit = digit.value,
-            charsetKindCount = (charsetKinds.value.flatMap { it.charset }.map { it.code } + if (customCharsetEnabled.value) customCharset.value
-                .codePoints()
-                .toList() else emptyList()).distinct().size
+            charsetKindCount = (charsetKinds.value.flatMap { it.charset }.map { it.code } +
+                    if (customCharsetEnabled.value) customCharset.value.toGraphemeList() else emptyList()).distinct().size
         )
         PasswordDisplay(
             password = password,
@@ -431,9 +429,13 @@ private fun makeAndCopyPassword(
     return result
 }
 
-private fun calcPasswordEntropy(digit: Int, charsetKindCount: Int): Float? = charsetKindCount.toDouble().pow(digit).let {
-    if (it.isInfinite()) null else (log2(it) * 10).roundToInt() / 10f
-}
+private fun calcPasswordEntropy(digit: Int, charsetKindCount: Int): Float? =
+    if (charsetKindCount == 0) 0f
+    else {
+        charsetKindCount.toDouble().pow(digit).let {
+            if (it.isInfinite()) null else (log2(it) * 10).roundToInt() / 10f
+        }
+    }
 
 private fun String.containsAllCharsets(charsetKinds: List<CharsetKind>, customCharset: String): Boolean {
     charsetKinds.forEach { charSetKind ->
