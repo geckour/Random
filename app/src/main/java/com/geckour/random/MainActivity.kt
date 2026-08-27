@@ -16,26 +16,29 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.Button
-import androidx.compose.material.Checkbox
-import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.OutlinedTextField
-import androidx.compose.material.Surface
-import androidx.compose.material.Text
-import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -69,6 +72,7 @@ import kotlin.math.log2
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 
 private const val DIGIT_MAX = 1000
 
@@ -81,14 +85,13 @@ class MainActivity : ComponentActivity() {
         fun newIntent(context: Context) = Intent(context, MainActivity::class.java)
     }
 
-    private val digit = mutableStateOf(DEFAULT_DIGIT)
-    private val charsetKinds = mutableStateOf(CharsetKind.values().toList())
+    private val digit = mutableIntStateOf(DEFAULT_DIGIT)
+    private val charsetKinds = mutableStateOf(CharsetKind.entries.toList())
     private val customCharset = mutableStateOf("")
     private val customCharsetEnabled = mutableStateOf(false)
 
     private lateinit var configRepository: ConfigRepository
 
-    @OptIn(ExperimentalMaterialApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -100,12 +103,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             RandomTheme {
                 val interactionSource = remember { MutableInteractionSource() }
-                val ripple = rememberRipple()
                 val rippleEnabled = remember { mutableStateOf(false) }
-                val forceGenerate = remember { mutableStateOf(-1L) }
+                val forceGenerate = remember { mutableLongStateOf(-1L) }
                 val password = makeAndCopyPassword(
                     seed = get<SeedRepository>().getSeed(),
-                    digit = digit.value,
+                    digit = digit.intValue,
                     charsetKinds = charsetKinds.value,
                     customCharset = if (customCharsetEnabled.value) customCharset.value else "",
                     onCopyPassword = { password ->
@@ -116,25 +118,26 @@ class MainActivity : ComponentActivity() {
                             )
                         )
                     },
-                    forceGenerate = forceGenerate.value
+                    forceGenerate = forceGenerate.longValue
                 )
                 // A surface container using the 'background' color from the theme
-                Surface(color = MaterialTheme.colors.background) {
+                Surface(color = MaterialTheme.colorScheme.background) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .clickable(enabled = rippleEnabled.value, indication = ripple, interactionSource = interactionSource, onClick = {})
+                            .clickable(enabled = rippleEnabled.value, onClick = {})
                     )
                     Generator(
-                        password,
-                        digit,
-                        charsetKinds,
-                        customCharset,
-                        customCharsetEnabled,
-                        ::storeConfig,
-                        interactionSource,
-                        rippleEnabled,
-                    ) { forceGenerate.value = System.currentTimeMillis() }
+                        modifier = Modifier.padding(WindowInsets.systemBars.asPaddingValues()),
+                        password = password,
+                        digit = digit,
+                        charsetKinds = charsetKinds,
+                        customCharset = customCharset,
+                        customCharsetEnabled = customCharsetEnabled,
+                        onStoreConfig = ::storeConfig,
+                        surfaceInteractionSource = interactionSource,
+                        rippleEnabled = rippleEnabled,
+                    ) { forceGenerate.longValue = System.currentTimeMillis() }
                 }
             }
         }
@@ -153,14 +156,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun restoreConfig() {
-        digit.value = configRepository.getDigit()
+        digit.intValue = configRepository.getDigit()
         charsetKinds.value = configRepository.getEnabledCharsetKinds()
         customCharset.value = configRepository.getCustomCharset()
         customCharsetEnabled.value = configRepository.getCustomCharsetEnabled()
     }
 
     private fun storeConfig() {
-        configRepository.setDigit(digit.value)
+        configRepository.setDigit(digit.intValue)
         configRepository.setEnabledCharsetKinds(charsetKinds.value)
         configRepository.setCustomCharset(customCharset.value)
         configRepository.setCustomCharsetEnabled(customCharsetEnabled.value)
@@ -169,6 +172,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun Generator(
+    modifier: Modifier = Modifier,
     password: String?,
     digit: MutableState<Int>,
     charsetKinds: MutableState<List<CharsetKind>>,
@@ -181,7 +185,7 @@ fun Generator(
 ) {
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .padding(horizontal = 16.dp, vertical = 24.dp)
             .fillMaxSize()
     ) {
@@ -203,7 +207,7 @@ fun Generator(
                     val press = PressInteraction.Press(center)
                     rippleEnabled.value = true
                     surfaceInteractionSource.tryEmit(press)
-                    delay(250)
+                    delay(250.milliseconds)
                     surfaceInteractionSource.tryEmit(PressInteraction.Release(press))
                     rippleEnabled.value = false
                 }
@@ -214,7 +218,7 @@ fun Generator(
 
 @Composable
 fun ColumnScope.Digit(digit: MutableState<Int>) {
-    val normalTextColor = MaterialTheme.colors.onBackground
+    val normalTextColor = MaterialTheme.colorScheme.onBackground
     var text by remember { mutableStateOf(digit.value.toString()) }
     var textColor by remember { mutableStateOf(normalTextColor) }
     OutlinedTextField(
@@ -239,7 +243,7 @@ fun ColumnScope.Digit(digit: MutableState<Int>) {
 @Composable
 fun Charsets(charsetKinds: MutableState<List<CharsetKind>>) {
     Spacer(modifier = Modifier.height(12.dp))
-    CharsetKind.values().forEach { charSetKind ->
+    CharsetKind.entries.forEach { charSetKind ->
         CharsetCheckbox(text = stringResource(charSetKind.labelResId), enabled = charsetKinds.value.contains(charSetKind)) { checked ->
             charsetKinds.value = (if (checked) charsetKinds.value + charSetKind else charsetKinds.value - charSetKind).distinct()
         }
@@ -307,18 +311,23 @@ fun Entropy(digit: Int, charsetKindCount: Int) {
         null -> {
             R.string.message_strength_very_strong to LightBlue600
         }
+
         in 0f..27.9f -> {
             R.string.message_strength_very_weak to Pink600
         }
+
         in 28f..35.9f -> {
             R.string.message_strength_weak to DeepOrange600
         }
+
         in 36f..59.9f -> {
             R.string.message_strength_reasonable to Lime600
         }
+
         in 60f..127.9f -> {
             R.string.message_strength_strong to Green600
         }
+
         else -> {
             R.string.message_strength_very_strong to LightBlue600
         }

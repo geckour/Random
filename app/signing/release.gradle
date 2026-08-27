@@ -1,0 +1,8 @@
+signingConfigs {
+    release {
+        storeFile file("./release.jks")
+        storePassword "594039ishiko480"
+        keyAlias "081"
+        keyPassword "594039ishiko480"
+    }
+}
